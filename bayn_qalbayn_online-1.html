@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#160d1d">
+<title>بين قلبين ❤️</title>
+<style>
+:root{--bg:#100b16;--card:#201629;--pink:#ff5e9b;--pink2:#ff9fc2;--text:#fff4f8;--muted:#cbb8c5;--line:#52364b}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#48213d 0,#170f20 42%,#0c0911 100%);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:22px 14px}
+.wrap{max-width:720px;margin:auto}.hero{text-align:center;padding:24px 12px 18px}.heart{font-size:42px;filter:drop-shadow(0 0 18px #ff5e9b)}h1{margin:8px 0;font-size:clamp(28px,7vw,42px)}.sub{color:var(--muted);margin:0}
+.card{background:linear-gradient(145deg,#28192f,#1a1322);border:1px solid var(--line);border-radius:22px;padding:20px;margin:14px 0;box-shadow:0 14px 35px #0005}
+h2{font-size:20px;margin:0 0 14px}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:130px}
+input,select,button{font:inherit;border-radius:13px;padding:13px 14px;border:1px solid var(--line);width:100%}input,select{background:#120d18;color:var(--text);outline:none}button{background:linear-gradient(100deg,var(--pink),#bd4caa);color:white;font-weight:750;border:0;cursor:pointer}button.secondary{background:#39243d;border:1px solid #704663}button:disabled{opacity:.45;cursor:not-allowed}
+.small{font-size:13px;color:var(--muted);line-height:1.7}.hidden{display:none!important}.roomcode{font-size:30px;letter-spacing:7px;font-weight:900;text-align:center;color:#ffb4d0;direction:ltr}.status{padding:10px 12px;border-radius:12px;background:#130e19;color:var(--muted);margin:10px 0}.pill{display:inline-block;background:#4a2944;color:#ffc4dc;border-radius:30px;padding:6px 12px;font-size:13px;margin:3px}
+.question{font-size:clamp(22px,5vw,30px);line-height:1.65;text-align:center;padding:24px 8px;min-height:145px;display:grid;place-items:center}.turn{text-align:center;color:#ffc2d9;font-weight:700}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.footer{text-align:center;color:#9d8999;font-size:12px;padding:18px}
+label{display:block;margin:9px 0 6px;color:var(--muted);font-size:14px}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero"><div class="heart">❤️</div><h1>بين قلبين ❤️</h1><p class="sub">أسئلة للحب والصراحة والذكريات، حتى لو كنتما بعيدين</p></header>
+
+  <section class="card" id="setup">
+    <h2>🎮 ادخلوا نفس الغرفة</h2>
+    <label for="nickname">اسمك داخل اللعبة</label>
+    <input id="nickname" maxlength="18" placeholder="مثلاً: أحمد" autocomplete="off">
+    <div class="row" style="margin-top:14px">
+      <button id="createBtn">إنشاء غرفة</button>
+      <div><input id="roomInput" maxlength="6" placeholder="كود الغرفة" style="text-transform:uppercase;direction:ltr;text-align:center"><button class="secondary" id="joinBtn" style="margin-top:8px">دخول بالكود</button></div>
+    </div>
+    <p class="small">أنشئ غرفة من هاتفك، ثم ابعث كود الغرفة للطرف الثاني ليدخل من هاتفه. الأسئلة والانتقال بينها يتزامنان مباشرة. لا تشاركوا الكود إلا مع الشخص المقصود.</p>
+  </section>
+
+  <section class="card hidden" id="lobby">
+    <h2>💌 غرفتكم</h2><div class="roomcode" id="roomCode"></div><button class="secondary" id="copyCodeBtn" style="margin-top:10px">نسخ كود الغرفة</button>
+    <div class="small" style="text-align:center">ابعثوا هذا الكود للطرف الثاني ليدخل الغرفة</div>
+    <div id="players" style="text-align:center;margin:12px 0"></div>
+    <div class="status" id="lobbyStatus">بانتظار اللاعب الثاني...</div>
+    <button id="startBtn" disabled>ابدأوا اللعب ❤️</button>
+  </section>
+
+  <section class="card hidden" id="game">
+    <div style="text-align:center"><span class="pill" id="category">❤️ حب</span><span class="pill" id="round">السؤال 1</span></div>
+    <div class="turn" id="turn"></div>
+    <div class="question" id="question">جاهزين؟</div>
+    <div class="actions">
+      <button id="nextBtn">السؤال التالي</button>
+      <button class="secondary" id="showCodeBtn">عرض كود الغرفة</button>
+    </div>
+    <p class="small" style="text-align:center">يمكن لأي لاعب الضغط على «السؤال التالي». اتفقوا أن تجيبوا بالتناوب وبصراحة واحترام.</p>
+  </section>
+
+  <section class="card hidden" id="done">
+    <h2 style="text-align:center">انتهت الجولة! 🥰</h2>
+    <p style="text-align:center">شكراً على الصراحة والوقت الجميل ❤️</p>
+    <button id="againBtn">العبوا من جديد</button>
+  </section>
+  <div class="footer">لعبة بين قلبين ❤️ • غرفة خاصة لشخصين • احترموا خصوصية بعضكما دائماً</div>
+</div>
+
+<script>
+// Firebase setup
+const firebaseConfig = {
+  apiKey: "AIzaSyCFS_YPBUsn38uIh98aMbLf3hLY-1kBxpg",
+  authDomain: "baynatna-asrar.firebaseapp.com",
+  databaseURL: "https://baynatna-asrar-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "baynatna-asrar",
+  storageBucket: "baynatna-asrar.firebasestorage.app",
+  messagingSenderId: "419465573772",
+  appId: "1:419465573772:web:abe80842afde94f4fcd2a9"
+};
+
+const questions = ["واش أول حاجة جذبتك فيّ؟","هل تغار بسهولة؟","تختار رحلة للبحر ولا للجبال؟","واش أكثر كلمة تحب تسمعها مني؟","كيف تتخيل بيتنا في المستقبل؟","هل سبق وخبيت عليّ شعور؟","تحب البوسة على الجبين؟","واش أكثر عادة غريبة عندك؟","هل الحب وحده يكفي لنجاح العلاقة؟","واش أكثر شيء يخليك تحس بالتقدير؟","هل سبق وتظاهرت بأنك مش مشتاق؟","تحب نمشيوا تحت المطر مع بعض؟","واش أكثر شيء تتمنى نديروه مع بعض؟","هل تقدر تثق فيّ بلا مراقبة؟","تختار رسالة حب ولا هدية مفاجئة؟","واش أجمل ذكرى بيناتنا؟","هل تحب أن تكون المبادرة من الطرفين بالتناوب؟","واش أكثر موقف محرج صرالك قدامي؟","هل تحب نكون أول شخص تشوفه في الصباح؟","واش أهم قيمة لازم تكون في عائلتنا؟","هل سبق وغرت عليّ وما قلتليش؟","تحب نخصصوا يوم كامل لبعض؟","هل تفضل حل الخلاف مباشرة ولا بعد الهدوء؟","واش أكثر حاجة تحبها في شخصيتي؟","هل تحب التعبير عن الحب بالكلام ولا بالأفعال؟","تختار سهرة هادئة ولا مغامرة؟","واش أكثر حاجة تخاف تخسرها في علاقتنا؟","هل تقدر تعترفلي كي تكون غالط؟","واش أكثر تفصيل صغير فيّ يعجبك؟","هل تحب تعرف مع من نهدر؟","كيف تتخيل أول يوم في بيتنا؟","هل سبق وبعثت رسالة للشخص الغلط؟","هل تحب الرسائل الرومانسية في الصباح؟","واش معنى الوفاء بالنسبة ليك؟","هل تحب المفاجآت ولا التخطيط المسبق؟","واش أكثر حاجة تطمنك في العلاقة؟","هل سبق وحسّيت أني ما فهمتكش؟","تختار نرجعوا لأول يوم تعرفنا فيه ولا نشوفوا مستقبلنا؟","واش أكثر موقف خلاك تحس بقيمتي؟","هل تحب نحتفل بكل ذكرى بيناتنا؟","واش أكثر حاجة تحب تبدلها في تعاملي معاك؟","هل تؤمن بالفرص الثانية؟","هل تفضّل قضاء وقت خاص مع الشريك صباحاً أم مساءً؟","واش أكثر لقب تحب نناديك بيه؟","هل تحب نشاركك كل أسراري؟","هل سبق وحلمت بيا؟","واش أكثر تصرف يثير غيرتك؟","تحب نمسك يدك قدام الناس؟","هل تحب أن تكون الأجواء رومانسية أم عفوية؟","واش الحلم اللي تحب نحققوه مع بعض؟","هل تقدر تحكيلي على مخاوفك؟","تختار نعيشوا قرب البحر ولا وسط الطبيعة؟","واش أكثر موقف حشمت فيه قدامي؟","هل تحب نكون واضح معاك في علاقاتي؟","واش أجمل طريقة نقدر نفرحك بيها؟","هل سبق وبكيت بسبب خلاف بيناتنا؟","هل تحب المفاجآت الرومانسية؟","واش أكثر شيء تعلمته من علاقتنا؟","واش أكثر كلمة حب تأثر فيك؟","هل تحب نكونوا صريحين حتى في أصعب المواضيع؟","واش أكثر حاجة تخليك تبتسم كي تتفكرني؟","هل تحب أن يفاجئك الشريك بأجواء رومانسية؟","هل سبق وتظاهرت أنك فاهم وأنت ما فهمتش؟","كيفاش تتخيل حياتنا بعد عشر سنوات؟","هل تفضل الاعتذار بالكلام ولا بالفعل؟","هل تحب أن تكون الأجواء الخاصة هادئة أم مرحة؟","واش أكثر شيء تحتاجه مني؟","تختار حضن طويل ولا كلام رومانسي؟","هل سبق وغرت وما حبيتش تبين؟","واش أجمل طريقة نتصالحوا بيها؟","هل تحب أن تعبّر عن اشتياقك بالكلام أم بالإشارات؟","هل تحب نحتفظوا بصور وذكريات كل مرحلة؟","واش أكثر شيء يقدر يزعفك مني؟","هل تحب نخصصوا وقت بلا هواتف لبعض؟","هل تحس بالأمان معايا؟","واش أكثر موقف ضحكت فيه على روحك؟","هل تحب أن تتحدث مع الشريك بصراحة عن الأشياء التي تريحك؟","تختار نهار كامل معايا بلا هاتف ولا أسبوع كامل نتواصلوا بالرسائل؟","واش أكثر حاجة تخليك تتمسك بيا؟","هل تحب نكتبلك رسالة حب بخط يدي؟","هل سبق وفهمت تصرف مني بطريقة خاطئة؟","واش المكان اللي تحلم نسكنوا فيه؟","هل تفضل الخصوصية ولا مشاركة كل شيء؟","هل تحب أن تكون المبادرة بين الزوجين بالتناوب؟","واش أكثر حاجة تتمنى نفهمها عليك أكثر؟","هل تحب نكون قريب منك وقت التعب؟","واش أكثر شيء تخاف منه في المستقبل؟","هل تقدر تغني قدامي بلا حشمة؟","هل تحب نعيشوا لحظات بسيطة ولا مغامرات كبيرة؟","واش التصرف اللي يخليك تحس بالإهمال؟","هل تحب نعاودوا أول خرجة بيناتنا؟","هل تحب أن تتفق مع الشريك على ما يريحكما؟","واش أكثر اعتراف حاب تقولهولي؟","هل تحب نكونوا صريحين في التعبير عن رغباتنا وحدودنا؟","هل تحب نحتفلوا بعيد ميلاد بعض بطريقة خاصة؟","واش أكثر حاجة ما تقبلهاش في العلاقة؟","هل سبق وحسيت بالوحدة رغم وجودي؟","واش أكثر حاجة تحب تعرفها عليّ؟","تختار نطبخوا مع بعض ولا نخرجوا نتعشاو؟","هل تحب الاهتمام اليومي؟","واش أجمل هدية ممكن تتلقاها مني؟","هل تحب نكون أول شخص تحكيله على يومك؟","هل سبق وقلت كلمة وندمت عليها مباشرة؟","واش أكثر شيء يقوي الثقة بيناتنا؟","هل تحب نبادلك الحضن كي تكون حزين؟","واش أكثر صفة تحبها في نفسك؟","هل تقدر تسامح على سوء تفاهم؟","واش أكثر موقف خلاك تتوتر معايا؟","هل تحب أن نناقش مشاكلنا مهما كانت؟","هل تتخيلني شريك حياتك؟","واش أكثر شيء تحب نحقّقوه قبل الزواج؟","هل تحب نتصوروا مع بعض بزاف؟","واش أكثر حاجة تحشم تقولها ليا؟","هل تحب نخصصوا يوم كامل لبعض؟","هل تفضل موعد رومانسي في الليل ولا خرجة في النهار؟","هل سبق وحسّيت أني ما نعطيكش الاهتمام الكافي؟","واش أكثر تصرف مني يفرحك؟","هل تحب نكونوا واضحين في الأمور اللي تريحنا واللي ما تريحناش؟","هل تقدر تواجه معايا أصعب الظروف؟","هل تحب نخططوا لمستقبلنا بالتفصيل؟","واش أكثر موقف تتمنى تنساه؟","هل تحب أن أشاركك تفاصيل يومي؟","واش أكثر حاجة تخليك تحس أنك محبوب؟","هل تحب نعيشوا في مدينة هادئة ولا كبيرة؟","هل تحب نكتب اسمك في رسالة رومانسية؟","هل سبق وحسيت بالغيرة من موقف بسيط؟","واش أكثر حاجة تتمنى تتغير في علاقتنا؟","هل تحب نحتفلوا بكل إنجاز نحققوه مع بعض؟","واش أغرب حلم حلمت بيه؟","هل تحب نكون قريب منك وقت الحزن؟","هل الحب الحقيقي يحتاج تضحية؟","هل تحب نكونوا عندنا أطفال؟","واش الأسماء اللي تعجبك لأولادنا؟","هل تحب أن يكون بين الزوجين مزاح ودلال؟","واش أكثر سؤال تخاف نسقسيهولك؟","هل تحب أن تتبادلوا الرسائل قبل النوم؟","واش أكثر حاجة تخليك تحس بالراحة النفسية؟","هل تحب نكون صريح معاك حتى لو الحقيقة توجع؟","هل سبق ونسيت مناسبة مهمة؟","واش أكثر شيء مستحيل تتنازل عليه في العلاقة؟","هل تحب نعيشوا مغامرة جديدة مع بعض؟","هل تحب نكونوا متفاهمين قبل اتخاذ القرارات؟","هل تفضل قضاء وقت خاص في الصباح أم في المساء؟","واش أكثر شيء تحبه في طريقة تفكيري؟","هل تحب أن يكون عندنا حيوان أليف؟","هل تحب أن نتبادل الاعتذارات بسرعة بعد الخلاف؟","واش أكثر وعد تحب تسمعه مني؟","هل تحب أن تكون الخصوصية بين الزوجين قائمة على الثقة؟","هل سبق وحسّيت أني ما فهمتش مشاعرك؟","واش أكثر شيء يفرحك في يومك؟","هل تحب نكونوا نضحكوا مع بعض حتى على أبسط الأمور؟","هل تحب أن نخصصوا وقتاً للحديث عن علاقتنا؟","واش أكثر صفة تحبها فيّ؟","هل تحب أن تكون هناك مفاجآت في المناسبات؟","هل تفضل الكلام الرومانسي أم التعبير بالأفعال؟","واش أكثر موقف خلاك تفتخر بيا؟","هل تحب أن نعيشوا قرب الطبيعة؟","هل تحب نكونوا صريحين حول حدودنا الشخصية؟","واش أكثر شيء تتمنى نحقّقوه في حياتنا؟","هل سبق وتظاهرت أنك مش زعلان؟","هل تحب نسمعوا أغنية مع بعض؟","هل تحب أن تتلقى رسالة حب مفاجئة؟","واش أكثر موقف خلاك تحس بالاشتياق ليا؟","هل تحب أن تكون العلاقة مبنية على التفاهم قبل كل شيء؟","هل تحب أن نقضي عطلة كاملة مع بعض؟","واش أكثر حاجة تحبها في علاقتنا؟","هل أنت سعيد في علاقتنا؟","واش أكثر شيء تتمنى يتحسن بيناتنا؟","هل تحس أني نعطيك الاهتمام الكافي؟","واش أكثر حاجة تخليك تتمسك بيا؟","هل عندك خوف ما سبق وحكيتلي عليه؟","واش الشيء اللي مستحيل تتنازل عليه في العلاقة؟","هل تحب نكونوا صريحين حتى في أصعب المواضيع؟","واش أكثر تصرف مني خلاك تفتخر بيا؟","هل تتمنى نكونوا أقرب لبعض عاطفياً؟","واش أكثر شيء تحب نحقّقوه قبل الزواج؟","هل تتخيلني شريك حياتك؟","واش أكثر وعد تحب تسمعه مني؟","هل تقدر تواجه معايا أصعب الظروف؟","واش أكثر حاجة تخليك تحس أنك محبوب؟","لو عندك فرصة تعاود أول لقاء بيناتنا، واش تبدل؟","واش الحاجة اللي ما تحبش تتغير في علاقتنا؟","لو توصف مستقبلنا بجملة، واش تقول؟","واش الرسالة اللي تحب توصلها ليا وما قلتهاش؟","هل تختارني من جديد لو رجع بيك الوقت؟","بعد هاذ الأسئلة كامل، واش حاب تقولّي من قلبك؟","هل تفضل قضاء وقت خاص بعد يوم طويل أم في يوم العطلة؟","هل تحب أن يفاجئك الشريك بكلمات رومانسية؟","ما أهم شيء يجعلك تشعر بالراحة والأمان في العلاقة الزوجية؟","هل تحب أن تكون الأجواء رومانسية أم عفوية؟","هل ترى أن التفاهم أهم من التجديد في العلاقة؟","هل تستطيع التعبير عن الأشياء التي لا ترتاح لها؟","هل تحب أن يعبّر الشريك عن اشتياقه بشكل مباشر؟","هل ترى أن المصارحة مهمة قبل أي تقارب؟","هل تفضّل الأجواء الهادئة أم الأجواء المرحة؟","هل تحب أن يكون بين الزوجين مزاح ودلال؟","هل تحب أن تتفق مع الشريك على ما يريحكما؟","هل تفضّل أن تكون الخصوصية في مكان هادئ؟","هل ترى أن القرب والمودة يزيدان المحبة بين الزوجين؟","هل تفضّل أن تكون الأجواء الخاصة عفوية أم تبدأ بسهرة رومانسية؟","هل تحب التعبير عن المشاعر بالكلام أم بالإشارات؟","هل تحب أن تكون هناك أجواء رومانسية في المناسبات؟","هل تفضّل أن تكون المبادرة من الطرفين بالتناوب؟","هل تحب أن تكون هناك لحظات خاصة دون مقاطعات؟","هل تفضّل أن تتحدثا عن الأمور التي تريحكما بصراحة؟","هل تحب أن تكون العلاقة قائمة على الاحترام المتبادل؟","ما أهم شيء تتمنى أن يبقى دائماً بيننا؟ ❤️","شكون يحب الثاني أكثر؟","شكون يشتاق للآخر أكثر؟","شكون يبادر بالصلح أولاً؟","شكون يتفكر تفاصيل الثاني أكثر؟","شكون يعبّر على حبه بالكلام أكثر؟","شكون يفرح كي توصله رسالة من الآخر أكثر؟","شكون يخطط لمفاجآت حلوة للآخر أكثر؟"];
+let app=null, db=null, auth=null, uid=null, myName='', roomId='', unsubscribe=null;
+const $ = id => document.getElementById(id);
+function show(id){['setup','lobby','game','done'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
+function setStatus(message){$('lobbyStatus').textContent=message;}
+function setHomeMessage(message){$('setupMsg').textContent=message;}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function makeCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<6;i++)out+=chars[Math.floor(Math.random()*chars.length)];return out;}
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function safeName(){return ($('nickname').value.trim()||'لاعب').slice(0,18);}
+async function init(){
+  if(!window.firebase) throw new Error('تعذر تحميل Firebase. تأكد من اتصال الإنترنت ثم أعد فتح الملف.');
+  if(!app){app=firebase.initializeApp(firebaseConfig);db=firebase.database();auth=firebase.auth();}
+  if(!auth.currentUser){await auth.signInAnonymously();}
+  uid=auth.currentUser.uid;
+}
+async function enterRoom(code,create){
+  myName=safeName();roomId=code;
+  const roomRef=db.ref('rooms/'+roomId);
+  if(create){
+    const snap=await roomRef.once('value');
+    if(snap.exists()) return enterRoom(makeCode(),true);
+    await roomRef.set({createdAt:Date.now(),host:uid,players:{[uid]:{name:myName,joinedAt:Date.now()}},state:'waiting',index:0,deck:[]});
+  }else{
+    const snap=await roomRef.once('value');
+    if(!snap.exists())throw new Error('لم نجد الغرفة. تأكد من الكود.');
+    const data=snap.val();
+    if(data.state==='playing')throw new Error('اللعبة بدأت بالفعل. اطلب من صاحب الغرفة إعادة فتح غرفة جديدة.');
+    const players=data.players||{};
+    if(players[uid]){ /* نفس اللاعب يعيد فتح غرفته */ }
+    else {
+      if(Object.keys(players).length>=2)throw new Error('الغرفة ممتلئة.');
+      await roomRef.child('players/'+uid).set({name:myName,joinedAt:Date.now()});
+    }
+  }
+  $('roomCode').textContent=roomId;
+  show('lobby');
+  if(unsubscribe)unsubscribe();
+  unsubscribe=roomRef.on('value',snap=>render(snap.val()),err=>alert('تعذر متابعة الغرفة: '+err.message));
+}
+function render(data){
+  if(!data)return;
+  const players=Object.entries(data.players||{}).sort((a,b)=>(a[1].joinedAt||0)-(b[1].joinedAt||0));
+  $('players').innerHTML=players.map(([id,p])=>'<span class="pill">'+escapeHtml(p.name)+(id===uid?' (أنت)':'')+'</span>').join('');
+  $('startBtn').disabled=players.length!==2||data.host!==uid||data.state==='playing';
+  $('lobbyStatus').textContent=players.length===2?'اكتمل اللاعبان! يمكن لصاحب الغرفة بدء اللعب.':'بانتظار اللاعب الثاني...';
+  if(data.state==='playing'){
+    const deck=Array.isArray(data.deck)?data.deck:[];const i=Number(data.index||0);
+    if(i>=deck.length){show('done');return;}
+    show('game');const q=deck[i];
+    $('category').textContent='❤️ سؤال بيناتنا';$('question').textContent=q;
+    $('round').textContent='السؤال '+(i+1)+' من '+deck.length;
+    $('turn').textContent='الدور على: '+(players[i%2]?.[1]?.name||'اللاعب');
+  }else if(data.state==='done'){show('done');}
+  else show('lobby');
+}
+async function createRoom(){
+  $('createBtn').disabled=true;$('joinBtn').disabled=true;
+  try{await init();let code=makeCode();await enterRoom(code,true);}
+  catch(e){alert(errorText(e));}
+  finally{$('createBtn').disabled=false;$('joinBtn').disabled=false;}
+}
+async function joinRoom(){
+  $('createBtn').disabled=true;$('joinBtn').disabled=true;
+  try{const code=$('roomInput').value.trim().toUpperCase();if(code.length!==6)throw new Error('اكتب كوداً من 6 أحرف.');await init();await enterRoom(code,false);}
+  catch(e){alert(errorText(e));}
+  finally{$('createBtn').disabled=false;$('joinBtn').disabled=false;}
+}
+function errorText(e){
+  const code=e&&e.code?e.code:'';
+  if(code==='auth/operation-not-allowed')return 'فعّل تسجيل الدخول المجهول Anonymous في Firebase Authentication.';
+  if(code==='PERMISSION_DENIED'||code==='database/permission-denied')return 'Firebase رفض الوصول. راجع قواعد Realtime Database وتأكد أنها تسمح بالقراءة والكتابة للمستخدم المسجّل.';
+  if(code==='auth/network-request-failed')return 'تعذر الاتصال. تأكد من الإنترنت وأعد المحاولة.';
+  return e&&e.message?e.message:'حدث خطأ غير معروف.';
+}
+async function startGame(){
+  if(!roomId)throw new Error('لا توجد غرفة مفتوحة.');
+  const snap=await db.ref('rooms/'+roomId).once('value');const data=snap.val();
+  if(!data||data.host!==uid)throw new Error('صاحب الغرفة فقط يقدر يبدأ اللعبة.');
+  if(Object.keys(data.players||{}).length!==2)throw new Error('لازم يدخل اللاعب الثاني أولاً.');
+  await db.ref('rooms/'+roomId).update({state:'playing',deck:shuffle(questions),index:0});
+}
+async function nextQuestion(){
+  if(!roomId)return;
+  await db.ref('rooms/'+roomId).transaction(current=>{
+    if(!current||current.state!=='playing')return current;
+    current.index=(current.index||0)+1;
+    if(current.index>=(current.deck||[]).length)current.state='done';
+    return current;
+  });
+}
+async function restart(){
+  if(!roomId)return;
+  const snap=await db.ref('rooms/'+roomId).once('value');const data=snap.val();
+  if(!data||data.host!==uid)throw new Error('صاحب الغرفة فقط يقدر يعاود اللعبة.');
+  await db.ref('rooms/'+roomId).update({state:'waiting',deck:[],index:0});
+}
+$('createBtn').addEventListener('click',createRoom);
+$('joinBtn').addEventListener('click',joinRoom);
+$('startBtn').addEventListener('click',()=>startGame().catch(e=>alert(errorText(e))));
+$('nextBtn').addEventListener('click',()=>nextQuestion().catch(e=>alert(errorText(e))));
+$('againBtn').addEventListener('click',()=>restart().catch(e=>alert(errorText(e))));
+$('showCodeBtn').addEventListener('click',()=>alert('كود الغرفة: '+roomId));
+$('copyCodeBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(roomId);alert('تم نسخ كود الغرفة: '+roomId);}catch(e){prompt('انسخ كود الغرفة:',roomId);}});
+$('roomInput').addEventListener('input',e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6));
+
+</script>
+</body>
+</html>
